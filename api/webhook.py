@@ -19,13 +19,18 @@ logging.basicConfig(level=logging.INFO)
 
 @app.post("/api/webhook")
 async def webhook(request: Request):
-    """Receives Telegram updates via webhook."""
-    data = await request.json()
-    logging.info(f"Received webhook data: {data}")
-    update = Update.de_json(data, telegram_app.bot)
-    await telegram_app.process_update(update)
-    logging.info("Processed update successfully.")
-    return {"ok": True}
+    try:
+        data = await request.json()
+        print("Received webhook data:", data)  # Logs to Vercel console
+        update = Update.de_json(data, telegram_app.bot)
+        await telegram_app.process_update(update)
+        return {"ok": True}
+    except Exception as e:
+        # Log the full exception
+        import traceback
+        tb = traceback.format_exc()
+        print("Webhook error:", tb)
+        return {"ok": False, "error": str(e)}
 
 @app.get("/")
 async def healthcheck():
