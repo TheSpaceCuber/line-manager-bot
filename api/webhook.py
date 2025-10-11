@@ -5,6 +5,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from bot.handlers import start, echo
 from bot.config import Config
+import asyncio
 
 if not Config.TELEGRAM_BOT_TOKEN:
     raise ValueError("❌ BOT_TOKEN environment variable is missing")
@@ -12,6 +13,8 @@ if not Config.TELEGRAM_BOT_TOKEN:
 telegram_app = Application.builder().token(Config.TELEGRAM_BOT_TOKEN).build()
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+
+asyncio.get_event_loop().run_until_complete(telegram_app.initialize())
 
 app = FastAPI()
 
