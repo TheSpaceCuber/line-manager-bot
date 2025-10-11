@@ -28,13 +28,14 @@ app = FastAPI(lifespan=lifespan)
 @app.post("/api/webhook")
 async def webhook(request: Request):
     try:
+        if not telegram_app._initialized:
+            await telegram_app.initialize()
         data = await request.json()
-        print("Received webhook data:", data)  # Logs to Vercel console
+        print("Received webhook data:", data)
         update = Update.de_json(data, telegram_app.bot)
         await telegram_app.process_update(update)
         return {"ok": True}
     except Exception as e:
-        # Log the full exception
         import traceback
         tb = traceback.format_exc()
         print("Webhook error:", tb)
