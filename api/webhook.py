@@ -15,14 +15,16 @@ telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
 
 
-app = FastAPI()
 
 logging.basicConfig(level=logging.INFO)
 @asynccontextmanager
 async def lifespan(app):
     await telegram_app.initialize()
     yield
-    
+
+
+app = FastAPI(lifespan=lifespan)
+
 @app.post("/api/webhook")
 async def webhook(request: Request):
     try:
