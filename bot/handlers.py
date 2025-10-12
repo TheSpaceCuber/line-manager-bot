@@ -14,10 +14,11 @@ async def echo(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def poll(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with next(get_db()) as db:
         session_ids = get_or_create_sessions(db)
+        poll_message_id = update.message.message_id  # type: ignore
         await update.message.reply_text(
-            format_poll_message(session_ids, db),
+            format_poll_message(session_ids, db, poll_message_id),
             parse_mode="Markdown",
-            reply_markup=build_poll_keyboard(session_ids, db),
+            reply_markup=build_poll_keyboard(session_ids, db, poll_message_id),
         )
     
 async def handle_poll_response(update: Update, context: ContextTypes.DEFAULT_TYPE):
