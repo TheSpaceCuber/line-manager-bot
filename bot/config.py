@@ -6,6 +6,8 @@ load_dotenv()
 class Config:
     # Telegram
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+    LOCAL_DEVELOPMENT_TELEGRAM_BOT_TOKEN = os.getenv("LOCAL_DEVELOPMENT_TELEGRAM_BOT_TOKEN")
+    
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///local.db")
 
     # Google Sheets
