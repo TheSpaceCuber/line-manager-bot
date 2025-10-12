@@ -30,7 +30,19 @@ Base = declarative_base()
 # ----------------------------------------------------------------
 # MODELS
 # ----------------------------------------------------------------
+class Absentee(Base):
+    __tablename__ = "absentees"
 
+    id = Column(Integer, primary_key=True)
+    telegram_handle = Column(String, index=True)
+    poll_message_id = Column(String, index=True)
+
+    def __repr__(self):
+        return (            
+            f"<Absentee(telegram_handle={self.telegram_handle}, "
+            f"poll_message_id={self.poll_message_id})"
+        )
+    
 class TrainingSession(Base):
     __tablename__ = "training_sessions"
 

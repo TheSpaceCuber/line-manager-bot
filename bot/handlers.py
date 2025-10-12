@@ -32,19 +32,19 @@ async def handle_poll_response(update: Update, context: ContextTypes.DEFAULT_TYP
     selected_option = query.data
     with next(get_db()) as db:
         session_ids = get_or_create_sessions(db)
-        action_msg, _ = toggle_vote(user_info, selected_option, session_ids, db)
-        if selected_option != "Cmi":
-            new_text = format_poll_message(session_ids, db)
-            new_markup = build_poll_keyboard(session_ids, db)
-            try:
-                await query.edit_message_text(
-                    text=new_text,
-                    parse_mode="Markdown",
-                    reply_markup=new_markup,
-                )
-            except Exception as e:
-                if "Message is not modified" in str(e):
-                    pass  # Ignore this error
-                else:
-                    raise
-        await query.answer(action_msg, show_alert=True)
+        poll_message_id = query.message.message_id
+        action_msg, _ = toggle_vote(user_info, selected_option, session_ids, db, poll_message_id)
+        new_text = format_poll_message(session_ids, db, poll_message_id)
+        new_markup = build_poll_keyboard(session_ids, db, poll_message_id)
+        try:
+            await query.edit_message_text(
+                text=new_text,
+                parse_mode="Markdown",
+                reply_markup=new_markup,
+            )
+        except Exception as e:
+            if "Message is not modified" in str(e):
+                pass  # Ignore this error
+            else:
+                raise
+    await query.answer(action_msg, show_alert=True)
