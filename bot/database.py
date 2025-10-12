@@ -35,7 +35,7 @@ class Absentee(Base):
 
     id = Column(Integer, primary_key=True)
     telegram_handle = Column(String, index=True)
-    poll_message_id = Column(String, index=True)
+    poll_message_id = Column(Integer, index=True)
 
     def __repr__(self):
         return (            
@@ -48,7 +48,7 @@ class TrainingSession(Base):
 
     id = Column(Integer, primary_key=True)
     date = Column(DateTime, default=datetime.utcnow)
-    poll_message_id = Column(String, nullable=True)  # Telegram poll message ID
+    poll_message_id = Column(Integer, nullable=True)  # Telegram poll message ID
     notes = Column(String, nullable=True)
 
     attendances = relationship("Attendance", back_populates="session")
