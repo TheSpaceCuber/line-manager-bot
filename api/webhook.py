@@ -2,8 +2,8 @@ import os
 import logging
 from fastapi import FastAPI, Request
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters
-from bot.handlers import start, echo
+from telegram.ext import CallbackQueryHandler,Application, CommandHandler, MessageHandler, filters
+from bot.handlers import start, echo, poll, handle_poll_response
 from bot.config import Config
 from contextlib import asynccontextmanager
 
@@ -13,7 +13,8 @@ if not Config.TELEGRAM_BOT_TOKEN:
 telegram_app = Application.builder().token(Config.TELEGRAM_BOT_TOKEN).build()
 telegram_app.add_handler(CommandHandler("start", start))
 telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
-
+telegram_app.add_handler(CommandHandler("poll", poll))
+telegram_app.add_handler(CallbackQueryHandler(handle_poll_response))
 
 
 logging.basicConfig(level=logging.INFO)
