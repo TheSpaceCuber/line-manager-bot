@@ -7,9 +7,13 @@ import pytz
 from bot.config import Config
 from bot.schema import Base, Poll, Vote
 
+db_url = Config.DATABASE_URL
+if db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    
 # Create async engine
 engine = create_async_engine(
-    Config.DATABASE_URL,
+    db_url,
     echo=False,  # Set to True for SQL query logging during development
     future=True
 )
