@@ -1,4 +1,3 @@
-# schema.py
 from sqlalchemy import (
     Column,
     String,
@@ -14,17 +13,14 @@ Base = declarative_base()
 class Poll(Base):
     """Represents a specific poll instance sent to a chat."""
     __tablename__ = 'polls'
-
-    # The unique ID of the poll provided by Telegram
+    
     id = Column(String, primary_key=True)
-    # The ID of the chat where the poll was sent
     chat_id = Column(BigInteger, nullable=False)
-    # The ID of the message that contains the poll
     message_id = Column(BigInteger, nullable=False, unique=True)
-    # Timestamp for when the poll was created. Crucial for our weekly logic.
-    created_at = Column(DateTime, server_default=func.now(), index=True)
-
-    # Relationship to easily access all votes for a poll via poll.votes
+    
+    # Change this line to use timezone-aware timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    
     votes = relationship("Vote", back_populates="poll", cascade="all, delete-orphan")
 
     def __repr__(self):
