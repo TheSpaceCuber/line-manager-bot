@@ -1,3 +1,4 @@
+# schema.py
 from sqlalchemy import (
     Column,
     String,
