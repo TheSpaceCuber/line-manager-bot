@@ -11,3 +11,6 @@ wheels/
 .pytest_cache/
 .env
 local.db
+
+lines_output.txt
+temp.py

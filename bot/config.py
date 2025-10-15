@@ -8,7 +8,7 @@ class Config:
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
     LOCAL_DEVELOPMENT_TELEGRAM_BOT_TOKEN = os.getenv("LOCAL_DEVELOPMENT_TELEGRAM_BOT_TOKEN")
     
-    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///local.db")
+    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///local.db")
 
     # Google Sheets
     GOOGLE_SHEETS_URL = os.getenv("GOOGLE_SHEETS_URL")

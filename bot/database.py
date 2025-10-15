@@ -1,132 +1,226 @@
-# bot/database.py
-from sqlalchemy import (
-    create_engine,
-    Column,
-    Integer,
-    String,
-    Boolean,
-    DateTime,
-    ForeignKey,
-)
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
-from datetime import datetime, timezone
-import os
-from dotenv import load_dotenv
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-load_dotenv()
-
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///local.db")
-
-engine = create_engine(DATABASE_URL, echo=False, future=True)
-logger.info(f"Database engine created. Connected to: {DATABASE_URL}")
-
-SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
-Base = declarative_base()
-
-# ----------------------------------------------------------------
-# MODELS
-# ----------------------------------------------------------------
-class Absentee(Base):
-    __tablename__ = "absentees"
-
-    id = Column(Integer, primary_key=True)
-    telegram_handle = Column(String, index=True)
-    poll_message_id = Column(Integer, index=True)
-
-    def __repr__(self):
-        return (            
-            f"<Absentee(telegram_handle={self.telegram_handle}, "
-            f"poll_message_id={self.poll_message_id})"
-        )
-    
-class TrainingSession(Base):
-    __tablename__ = "training_sessions"
-
-    id = Column(Integer, primary_key=True)
-    date = Column(DateTime, default=datetime.utcnow)
-    poll_message_id = Column(Integer, nullable=True)  # Telegram poll message ID
-    notes = Column(String, nullable=True)
-
-    attendances = relationship("Attendance", back_populates="session")
-
-    def __repr__(self):
-        return f"<TrainingSession(id={self.id}, date={self.date.date()})>"
-
-
-class Attendance(Base):
-    __tablename__ = "attendance"
-
-    id = Column(Integer, primary_key=True)
-    session_id = Column(Integer, ForeignKey("training_sessions.id"))
-    telegram_handle = Column(String, index=True)
-    present = Column(Boolean, default=True)
-    source = Column(String, default="poll")  # e.g., "poll", "manual"
-    timestamp = Column(DateTime, default=datetime.utcnow)
-
-    session = relationship("TrainingSession", back_populates="attendances")
-
-    def __repr__(self):
-        return (
-            f"<Attendance(handle={self.telegram_handle}, "
-            f"session={self.session_id}, present={self.present})>"
-        )
-
-
-# ----------------------------------------------------------------
-# DB UTILITIES
-# ----------------------------------------------------------------
-
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy import select, delete
 from datetime import datetime, timedelta
+from typing import List, Optional
+import pytz
 
-def get_or_create_sessions(db):
-    """Get or create TrainingSession for next Thu and Sat."""
-    today = datetime.now(timezone.utc).date()
-    weekday = today.weekday()
-    # Find next Thursday (weekday=3) and Saturday (weekday=5)
-    days_until_thu = (3 - weekday) % 7
-    days_until_sat = (5 - weekday) % 7
-    thu_date = today + timedelta(days=days_until_thu)
-    sat_date = today + timedelta(days=days_until_sat)
+from bot.config import Config
+from bot.schema import Base, Poll, Vote
 
-    thu_session = db.query(TrainingSession).filter(
-        TrainingSession.date >= datetime(thu_date.year, thu_date.month, thu_date.day),
-        TrainingSession.date < datetime(thu_date.year, thu_date.month, thu_date.day) + timedelta(days=1)
-    ).first()
-    if not thu_session:
-        thu_session = TrainingSession(date=datetime(thu_date.year, thu_date.month, thu_date.day, 19, 30), notes="Thu 730pm @ YCK")
-        db.add(thu_session)
-        db.commit()
-        db.refresh(thu_session)
+# Create async engine
+engine = create_async_engine(
+    Config.DATABASE_URL,
+    echo=False,  # Set to True for SQL query logging during development
+    future=True
+)
 
-    sat_session = db.query(TrainingSession).filter(
-        TrainingSession.date >= datetime(sat_date.year, sat_date.month, sat_date.day),
-        TrainingSession.date < datetime(sat_date.year, sat_date.month, sat_date.day) + timedelta(days=1)
-    ).first()
-    if not sat_session:
-        sat_session = TrainingSession(date=datetime(sat_date.year, sat_date.month, sat_date.day, 9, 45), notes="Sat 945am")
-        db.add(sat_session)
-        db.commit()
-        db.refresh(sat_session)
+# Create async session factory
+AsyncSessionLocal = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False
+)
 
-    return {"Thu": thu_session.id, "Sat": sat_session.id}
+# Singapore timezone
+SGT = pytz.timezone('Asia/Singapore')
 
-def init_db():
-    """Create all tables (idempotent)."""
-    Base.metadata.create_all(bind=engine)
 
-# Call this once at startup
-init_db()
+async def init_db():
+    """Initialize the database by creating all tables."""
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
-def get_db():
-    """Provide a session context (e.g. inside a FastAPI or bot handler)."""
-    db = SessionLocal()
-    logger.info("Database session started.")
-    try:
-        yield db
-    finally:
-        logger.info("Database session closed.")
-        db.close()
+# init db at startup
+import asyncio
+asyncio.run(init_db())
+
+async def get_week_bounds(reference_date: datetime = datetime.now(SGT)) -> tuple[datetime, datetime]:
+    """
+    Get the start (Sunday 00:00) and end (Saturday 23:59:59) of the week
+    for a given reference date in SGT timezone.
+    
+    Args:
+        reference_date: The date to get week bounds for. Defaults to now.
+    
+    Returns:
+        Tuple of (week_start, week_end) as timezone-aware datetime objects
+    """
+    if reference_date is None:
+        reference_date = datetime.now(SGT)
+    elif reference_date.tzinfo is None:
+        reference_date = SGT.localize(reference_date)
+    else:
+        reference_date = reference_date.astimezone(SGT)
+    
+    # Find the most recent Sunday (or today if it's Sunday)
+    days_since_sunday = reference_date.weekday()
+    if days_since_sunday == 6:  # Sunday
+        days_to_subtract = 0
+    else:
+        days_to_subtract = days_since_sunday + 1
+    
+    week_start = reference_date - timedelta(days=days_to_subtract)
+    week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Week ends on Saturday 23:59:59
+    week_end = week_start + timedelta(days=6, hours=23, minutes=59, seconds=59)
+    
+    return week_start, week_end
+
+
+async def save_poll(poll_id: str, chat_id: int, message_id: int) -> Poll:
+    """
+    Save a new poll to the database.
+    
+    Args:
+        poll_id: The unique Telegram poll ID
+        chat_id: The chat where the poll was sent
+        message_id: The message ID of the poll
+    
+    Returns:
+        The created Poll object
+    """
+    async with AsyncSessionLocal() as session:
+        poll = Poll(
+            id=poll_id,
+            chat_id=chat_id,
+            message_id=message_id
+        )
+        session.add(poll)
+        await session.commit()
+        await session.refresh(poll)
+        return poll
+
+
+async def get_current_week_poll(chat_id: int) -> Optional[Poll]:
+    """
+    Get the poll for the current week (Sunday-Saturday) in a specific chat.
+    
+    Args:
+        chat_id: The chat ID to search in
+    
+    Returns:
+        Poll object if found, None otherwise
+    """
+    week_start, week_end = await get_week_bounds()
+    
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Poll)
+            .where(
+                Poll.chat_id == chat_id,
+                Poll.created_at >= week_start,
+                Poll.created_at <= week_end
+            )
+            .order_by(Poll.created_at.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
+
+async def save_votes(poll_id: str, user_id: int, user_first_name: str, 
+                     user_username: Optional[str], option_texts: List[str]) -> List[Vote]:
+    """
+    Save all votes from a user for a poll. This will first remove any existing
+    votes from this user for this poll, then add the new votes.
+    
+    Args:
+        poll_id: The poll ID
+        user_id: The user's Telegram ID
+        user_first_name: The user's first name
+        user_username: The user's username (without @), can be None
+        option_texts: List of option texts the user voted for
+    
+    Returns:
+        List of created Vote objects
+    """
+    async with AsyncSessionLocal() as session:
+        # First, remove all existing votes from this user for this poll
+        await session.execute(
+            delete(Vote).where(
+                Vote.poll_id == poll_id,
+                Vote.user_id == user_id
+            )
+        )
+        
+        # Then add the new votes
+        votes = []
+        for option_text in option_texts:
+            vote = Vote(
+                poll_id=poll_id,
+                user_id=user_id,
+                option_text=option_text,
+                user_first_name=user_first_name,
+                user_username=user_username
+            )
+            session.add(vote)
+            votes.append(vote)
+        
+        await session.commit()
+        
+        # Refresh all votes to get any server-side defaults
+        for vote in votes:
+            await session.refresh(vote)
+        
+        return votes
+
+
+async def remove_user_votes(poll_id: str, user_id: int) -> int:
+    """
+    Remove all votes from a specific user for a specific poll.
+    
+    Args:
+        poll_id: The poll ID
+        user_id: The user's Telegram ID
+    
+    Returns:
+        Number of votes deleted
+    """
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            delete(Vote).where(
+                Vote.poll_id == poll_id,
+                Vote.user_id == user_id
+            )
+        )
+        await session.commit()
+        return result.rowcount
+
+
+async def get_poll_votes(poll_id: str) -> List[Vote]:
+    """
+    Get all votes for a specific poll, ordered by option and user name.
+    
+    Args:
+        poll_id: The poll ID
+    
+    Returns:
+        List of Vote objects
+    """
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Vote)
+            .where(Vote.poll_id == poll_id)
+            .order_by(Vote.option_text, Vote.user_first_name)
+        )
+        votes = result.scalars().all()
+        
+        # Return a list copy since the session will close
+        return list(votes)
+
+
+async def get_poll_by_id(poll_id: str) -> Optional[Poll]:
+    """
+    Get a poll by its ID.
+    
+    Args:
+        poll_id: The poll ID
+    
+    Returns:
+        Poll object if found, None otherwise
+    """
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(Poll).where(Poll.id == poll_id)
+        )
+        return result.scalar_one_or_none()
