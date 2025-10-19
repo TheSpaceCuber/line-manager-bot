@@ -1,9 +1,8 @@
 import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler, PollAnswerHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from bot.config import Config
-from bot.handlers import poll_command, lines_command, poll_answer_handler
-
+from bot.handlers import echo
 
 # Enable logging
 logging.basicConfig(
@@ -23,9 +22,8 @@ def main() -> None:
     application = Application.builder().token(Config.LOCAL_DEVELOPMENT_TELEGRAM_BOT_TOKEN).build()
    
     # Register handlers
-    application.add_handler(CommandHandler('poll', poll_command))
-    application.add_handler(CommandHandler('lines', lines_command))
-    application.add_handler(PollAnswerHandler(poll_answer_handler))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+
    
     # Start the bot
     logger.info('Bot started')
