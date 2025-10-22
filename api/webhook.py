@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI, Request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
-from bot.handlers import echo
+from bot.handlers import handle_lines_split_via_poll_text
 from bot.config import Config
 from contextlib import asynccontextmanager
 
@@ -11,7 +11,7 @@ if not Config.TELEGRAM_BOT_TOKEN:
     raise ValueError("❌ TELEGRAM_BOT_TOKEN environment variable is missing")
 
 telegram_app = Application.builder().token(Config.TELEGRAM_BOT_TOKEN).build()
-telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_lines_split_via_poll_text))
 
 logging.basicConfig(level=logging.INFO)
 @asynccontextmanager

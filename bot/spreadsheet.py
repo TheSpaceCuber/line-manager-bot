@@ -13,6 +13,9 @@ class SpreadsheetLoader:
             "groups": f"{base}/gviz/tq?tqx=out:csv&gid={Config.GOOGLE_SHEETS_GROUPS_GID}",
             "config": f"{base}/gviz/tq?tqx=out:csv&gid={Config.GOOGLE_SHEETS_CONFIG_GID}",
         }
+    
+    def load_player_data(self) -> pd.DataFrame:
+        return self.load_sheet("players")
 
     def load_sheet(self, name: str) -> pd.DataFrame:
         url = self.urls.get(name)
@@ -32,3 +35,9 @@ class SpreadsheetLoader:
             "groups": self.load_sheet("groups"),
             "config": self.load_sheet("config"),
         }
+
+
+if __name__ == "__main__":
+    loader = SpreadsheetLoader()
+    sheets = loader.load_player_data()
+    print(sheets.head())

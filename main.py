@@ -2,7 +2,7 @@ import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 from bot.config import Config
-from bot.handlers import echo
+from bot.handlers import handle_lines_split_via_poll_text
 
 # Enable logging
 logging.basicConfig(
@@ -22,7 +22,7 @@ def main() -> None:
     application = Application.builder().token(Config.LOCAL_DEVELOPMENT_TELEGRAM_BOT_TOKEN).build()
    
     # Register handlers
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_lines_split_via_poll_text))
 
    
     # Start the bot
