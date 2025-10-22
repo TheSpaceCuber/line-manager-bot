@@ -24,15 +24,21 @@ async def handle_lines_split_via_poll_text(update: Update, context: ContextTypes
     print("Names under Thu option:", thu_names)
     
     splitter = Splitter()
-    line_x, line_y, stats = splitter.split_lines(thu_names) # returns (line1, line2)
+    line_x, line_y, stats = splitter.split_lines(thu_names)  # returns (line1, line2, stats)
     
-    msg = (
+    # Format first message: player assignment
+    lines_msg = (
         "🏃 **Thursday Lines Split** 🏃\n\n"
-        f"*Darks* ({len(line_x)} players):\n" +
-        "\n".join(f"- {name}" for name in line_x) +
-        "\n\n" +
-        f"*Lights* ({len(line_y)} players):\n" +
-        "\n".join(f"- {name}" for name in line_y) + "\n\n" + "\n".join(stats)
+        f"*Darks* ({len(line_x)} players):\n"
+        + "\n".join(f"- {name}" for name in line_x)
+        + "\n\n"
+        f"*Lights* ({len(line_y)} players):\n"
+        + "\n".join(f"- {name}" for name in line_y)
     )
 
-    await update.message.reply_text(msg, parse_mode="Markdown")
+    # Format second message: stats summary
+    stats_msg = "\n".join(stats)
+
+    # Send two separate Telegram messages
+    await update.message.reply_text(lines_msg, parse_mode="Markdown")
+    await update.message.reply_text(stats_msg, parse_mode="Markdown")
